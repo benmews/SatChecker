@@ -36,10 +36,6 @@ def setup(clauses, activity_counter_setting):
         watch[var] = []
         watch[-var] = []
     activity_division_counter = activity_counter_setting
-    for clause_index, clause in enumerate(clauses):
-        watched_variables[clause_index] = []
-        for var in clause[0:2]:
-            watch, added, watched_variables = addToWatch(clause_index, clause, watch, trail, watched_variables)
     dat={}
     dat["clauses"] = clauses
     dat["watch"] = watch
@@ -48,46 +44,57 @@ def setup(clauses, activity_counter_setting):
     dat["watched_variables"] = watched_variables
     dat["num_vars"] = num_vars
     dat["variable_set"] = variable_set
-    return variable_set, num_vars, trail, activities, watch, watched_variables, activity_division_counter
+    for clause_index, clause in enumerate(clauses):
+        watched_variables[clause_index] = []
+        for var in clause[0:2]:
+            added = addToWatch(clause_index, clause, dat)
+    
+    return dat, activity_division_counter
 
-def increase_activities(conflict_parts, activities):
+def manage_activity_counter(activity_division_counter, activity_counter_setting, dat):
+    activity_division_counter = activity_division_counter-1
+    if activity_division_counter == 0:
+        for var in dat["variable_set"]:
+            dat["activities"][var] = dat["activities"][var]/2
+        activity_division_counter = activity_counter_setting
+
+def increase_activities(conflict_parts, dat):
     for part in conflict_parts:
         var = part[0]
         if var < 0:var = var*-1
-        activities[var] = activities[var]+1
-    return activities
+        dat["activities"][var] = dat["activities"][var]+1
 
-def addToWatch(clause_index, clause, watch, trail, watched_variables):
-    vars_assigned = getAssignedVars(trail)
-    vars_watched = watched_variables[clause_index]
+def addToWatch(clause_index, clause, dat):
+    vars_assigned = getAssignedVars(dat)
+    vars_watched = dat["watched_variables"][clause_index]
     vars_open = [x for x in clause if x not in vars_watched]
     vars_open = [x for x in vars_open if x not in vars_assigned]
     if len(vars_open) == 0:
-        return watch, "unsat", watched_variables
+        return "unsat"
     var = vars_open[0]
-    watch[var].append(clause_index)
-    watched_variables[clause_index].append(var)
-    print("trail: " + str(trail))
+    dat["watch"][var].append(clause_index)
+    dat["watched_variables"][clause_index].append(var)
+    print("trail: " + str(dat["trail"]))
 #    print("clause = " + str(clause))
 #    print("assigned = "+str(vars_assigned))
 #    print("vars watched = " + str(vars_watched))
 #    print("vars open = " + str( vars_open))
 #    print("watch:" +str(watch))
-    return watch, "goon", watched_variables
+    return "goon"
 
-def removeWatch(clauses, watch, trail, var, watched_variables):
-    watch_this = watch[var].copy()
-    print("trail= "+ str(trail))
+def removeWatch(dat, var):
+    watch_this = dat["watch"][var].copy()
+    print("trail= "+ str(dat["trail"]))
 #    print("watch_this: "+str(watch_this)+", var= " + str(var))
     for clause_index in watch_this:
-        watch, added, watched_variables = addToWatch(clause_index, clauses[clause_index], watch, trail, watched_variables)
-        watch[var].remove(clause_index)
-        watched_variables[clause_index].remove(var)
-    return watch, added, watched_variables
+        added = addToWatch(clause_index, dat["clauses"][clause_index], dat)
+        dat["watch"][var].remove(clause_index)
+        dat["watched_variables"][clause_index].remove(var)
+    return added
 
-def getAssignedVars(trail):
+def getAssignedVars(dat):
     assigned = []
-    for trai in trail:
+    for trai in dat["trail"]:
         assigned.append(trai[0])
     return assigned
 
@@ -96,22 +103,22 @@ def getWatchedVars(watch, clause_index):
     variables = [var for var, cl_index in enumerate(watch) if cl_index == clause_index]
     return variables
 
-def hasState(clauses, trail, watch): # not necessary bec of two watched lit scheme?
+def hasState(dat): # not necessary bec of two watched lit scheme?
     sat_clauses_counter = 0
-    for cl_index, clause in enumerate(clauses):
-        state, var = checkState(clauses, trail, cl_index, clause)
+    for cl_index, clause in enumerate(dat["clauses"]):
+        state, var = checkState(dat, cl_index, clause)
         if state == "unsat":
             return "unsat", var, cl_index
         if state == "sat":
             sat_clauses_counter = sat_clauses_counter+1
         if state == 1:
             return "unit", var, cl_index
-    if sat_clauses_counter == len(clauses):
+    if sat_clauses_counter == len(dat["clauses"]):
         return "sat", var, cl_index
     return False, var, cl_index
 
-def checkState(clauses, trail, cl_index, clause):
-    assigned = getAssignedVars(trail)
+def checkState(dat, cl_index, clause):
+    assigned = getAssignedVars(dat)
     unsatisfied_vars = 0
     openvars = []
     for var in clause:
@@ -129,37 +136,37 @@ def checkState(clauses, trail, cl_index, clause):
     return len(clause)-unsatisfied_vars, var
             
 
-def decide(clauses, trail, watch, activities, num_vars, variable_set, watched_variables):
-    print("lentrail = "+ str(len(trail))+", numvars = " +str(num_vars))
-    if len(trail) >= num_vars:
-        return False, trail, watch, activities, watched_variables
-    unassigned = [var for var in variable_set if var not in getAssignedVars(trail)]
-    activities_unassigned = { key:value for key, value in activities.items() if key in unassigned}
+def decide(dat):
+    print("lentrail = "+ str(len(dat["trail"]))+", numvars = " +str(dat["num_vars"]))
+    if len(dat["trail"]) >= dat["num_vars"]:
+        return False
+    unassigned = [var for var in dat["variable_set"] if var not in getAssignedVars(dat)]
+    activities_unassigned = { key:value for key, value in dat["activities"].items() if key in unassigned}
     var = max(activities_unassigned)
     var = var*-1 # negative first
-    trail.append([var, "DL"]) # var, DL or clause
-    watch, added, watched_variables = removeWatch(clauses, watch, trail, var*-1, watched_variables)
-    return True, trail, watch, activities, watched_variables
+    dat["trail"].append([var, "DL"]) # var, DL or clause
+    added = removeWatch(dat, var*-1)
+    return True
     
-def backtrack(clauses, trail, watch, activities, watched_variables):
+def backtrack(dat):
     print("backtrack")
     DL_or_cl = "start"
     conflict_parts = []
     while True:
-        if len(trail) == 0:
-            return clauses, trail, watch, activities, False
-        var, DL_or_cl = trail[-1]
-        del trail[-1]
+        if len(dat["trail"]) == 0:
+            return False
+        var, DL_or_cl = dat["trail"][-1]
+        del dat["trail"][-1]
         conflict_parts.append([var, DL_or_cl])
         if DL_or_cl == "DL": break;
-    activities = increase_activities(conflict_parts, activities)  
-    clauses, watch, watched_variables = add_conflict_clause(clauses, trail, watch, conflict_parts, watched_variables)     
-    return clauses, trail, watch, activities, watched_variables, True
+    increase_activities(conflict_parts, dat)  
+    add_conflict_clause(dat, conflict_parts)     
+    return True
 
-def add_conflict_clause(clauses, trail, watch, conflict_parts, watched_variables):
-    conflict_clause = clauses[conflict_parts[0][1]].copy()
+def add_conflict_clause(dat, conflict_parts):
+    conflict_clause = dat["clauses"][conflict_parts[0][1]].copy()
     for part in conflict_parts[1:-2]: # 0 is conflict variable, 1 is clause_index
-        other_clause = clauses[part[1]].copy()
+        other_clause = dat["clauses"][part[1]].copy()
         if part[0] in conflict_clause:
             conflict_clause.remove(part[0])
             other_clause.remove(part[0]*-1)
@@ -167,56 +174,46 @@ def add_conflict_clause(clauses, trail, watch, conflict_parts, watched_variables
             conflict_clause.remove(part[0]*-1)
             other_clause.remove(part[0])
         conflict_clause=list(set(conflict_clause+other_clause))
-    clauses.append(conflict_clause)
-    clause_index = len(clauses)
-    watch, added, watched_variables = addToWatch(clause_index, conflict_clause, watch, trail, watched_variables)
-    watch, added, watched_variables = addToWatch(clause_index, conflict_clause, watch, trail, watched_variables)
-    return clauses, watch, watched_variables
+    dat["clauses"].append(conflict_clause)
+    clause_index = len(dat["clauses"])
+    added = addToWatch(clause_index, conflict_clause, dat)
+    added = addToWatch(clause_index, conflict_clause, dat)
 
-def BCP(clauses, trail, watch, watched_variables):
-    state, var, cl_index  = hasState(clauses, trail, watch)
+def BCP(dat):
+    state, var, cl_index  = hasState(dat)
     print("in BCP: state =" + str(state) + ", var = "+ str(var) + ", cl_index = " + str(cl_index))
     propagated = False
     while state == "unit":
         propagated == True
-        trail.append([var, cl_index])
-        state, var, cl_index = hasState(clauses, trail, watch)
+        dat["trail"].append([var, cl_index])
+        state, var, cl_index = hasState(dat)
         if state == "unsat" or state == "sat":
-            return state, trail, watched_variables
-        watch, added, watched_variables = removeWatch(clauses, watch, trail, var*-1, watched_variables)
-        state, var, cl_index  = hasState(clauses, trail, watch)
-    if hasState(clauses, trail, watch)[0] == "unsat"  or hasState(clauses, trail, watch)[0] == "sat":
-        return state, trail, watched_variables
-    return propagated, trail, watched_variables
-
-
-def manage_activity_counter(activity_division_counter, variable_set, activity_counter_setting, activities):
-    activity_division_counter = activity_division_counter-1
-    if activity_division_counter == 0:
-        for var in variable_set:
-            activities[var] = activities[var]/2
-        activity_division_counter = activity_counter_setting
-    return activity_division_counter, activities
+            return state
+        added = removeWatch(dat, var*-1)
+        state, var, cl_index  = hasState(dat)
+    if hasState(dat)[0] == "unsat"  or hasState(dat)[0] == "sat":
+        return state
+    return propagated
 
 
 def DPLL(clauses, activity_counter_setting):
-    variable_set, num_vars, trail, activities, watch, watched_variables, activity_division_counter = setup(clauses, activity_counter_setting)
+    dat, activity_division_counter = setup(clauses, activity_counter_setting)
 
-    BCP_result, trail, watched_variables = BCP(clauses, trail, watch, watched_variables)
+    BCP_result = BCP(dat)
     if BCP_result == "unsat":return "unsat"
 
     while True:
-        dec_false, trail, watch, activities, watched_variables= decide(clauses, trail, watch, activities, num_vars, variable_set, watched_variables)
+        dec_false = decide(dat)
         if not dec_false:return "sat"
-        BCP_result, trail, watched_variables = BCP(clauses, trail, watch, watched_variables)
+        BCP_result = BCP(dat)
         if BCP_result == "sat":return "sat"
         while BCP_result == True:
-            clauses, trail, watch, activities, watched_variables, has_backtracked = backtrack(clauses, trail, watch, activities, watched_variables)
+            has_backtracked = backtrack(dat)
             if not has_backtracked:return "unsat"
-            BCP_result, trail, watched_variables = BCP(clauses, trail, watch, watched_variables)
+            BCP_result = BCP(dat)
             if BCP_result == "sat":return "sat"
             
-        activity_division_counter, activities = manage_activity_counter(activity_division_counter, variable_set, activity_counter_setting, activities)
+        manage_activity_counter(activity_division_counter, activity_counter_setting, dat)
 
 def run(file):
     result = DPLL(delete_doubles(parse_dimacs(file)), 100)
