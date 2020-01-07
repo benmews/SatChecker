@@ -2,3 +2,5 @@ c Example file benchmarks/example-1.cnf
 p cnf 1 1
 6 11 0
 -6 11 0
+1 -11 0
+-1 0
