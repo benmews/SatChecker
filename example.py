@@ -1,6 +1,6 @@
 import sys
 
-def parse_dimacs(filename):
+def parse_dimacs():
     clauses = []
     with open(sys.argv[1], 'r') as input_file:
         for line in input_file:
@@ -35,7 +35,7 @@ def setup(clauses):
         activities[var] = 0
 #        watch[var] = []
 #        watch[-var] = []
-    activity_counter_setting = 100
+    activity_counter_setting = 10
     activity_division_counter = activity_counter_setting
     dat={}
     dat["clauses"] = clauses
@@ -148,20 +148,21 @@ def checkClause(dat, cl_index, clause):
     if lenopenvars >= 2:
         return "unresolved", openvars[0]
    
-def add_conflict_clause(dat, conflict_parts):
-    for part in conflict_parts[:-1]:
-        print(dat["clauses"][part[1]])
-    conflict_clause = dat["clauses"][conflict_parts[0][1]].copy()
-    for part in conflict_parts[1:-1]: # 0 is conflict variable, 1 is clause_index
-        other_clause = dat["clauses"][part[1]].copy()
-        if part[0] in conflict_clause:
-            conflict_clause.remove(part[0])
-            other_clause.remove(part[0]*-1)
-        else:
-            conflict_clause.remove(part[0]*-1)
-            other_clause.remove(part[0])
-        conflict_clause=list(set(conflict_clause+other_clause))
-    dat["clauses"].append(conflict_clause)
+#def add_conflict_clause(dat, conflict_parts):
+#    for part in conflict_parts[:-1]:
+#        print(dat["clauses"][part[1]])
+#    conflict_clause = dat["clauses"][conflict_parts[0][1]].copy()
+#    for part in conflict_parts[1:-1]: # 0 is conflict variable, 1 is clause_index
+#        other_clause = dat["clauses"][part[1]].copy()
+#        if part[0] in conflict_clause:
+#            conflict_clause.remove(part[0])
+#            other_clause.remove(part[0]*-1)
+#        else:
+#            conflict_clause.remove(part[0]*-1)
+#            other_clause.remove(part[0])
+#        conflict_clause=list(set(conflict_clause+other_clause))
+#    dat["clauses"].append(conflict_clause)
+        
 #    clause_index = len(dat["clauses"])
 #    added, var = addToWatch(clause_index, conflict_clause, dat) # wenn 2scheme, auch hier prop
 #    added, var = addToWatch(clause_index, conflict_clause, dat)
@@ -175,7 +176,6 @@ def decide(dat):
     var = var*-1 # negative first
     dat["trail"].append([var, "DL"]) # var, DL or clause
 #    added, var = addAndRemoveWatch(dat, var*-1)
-    print("decide end. trail= "+ str(dat["trail"]))
     
 def backtrack(dat, var, cl_index):
     conflict_parts = [[var, cl_index]]
@@ -186,40 +186,35 @@ def backtrack(dat, var, cl_index):
         conflict_parts.append([var, DL_or_cl])
         del dat["trail"][-1]
         if DL_or_cl == "DL": break;
-    print("conflict parts = " + str(conflict_parts))
-    add_conflict_clause(dat, conflict_parts) 
+    dat["trail"].append([var*-1, "Backtrack"])
+#    add_conflict_clause(dat, conflict_parts) 
     manage_activity_counter(dat, conflict_parts)
 
 def BCP(dat):
     while True:
         state, var, cl_index = hasState(dat)
         if state == "unsat":
-            print("BCP unsat")
             return state, var, cl_index
         elif state == "sat":
-            print("BCP sat")
             sat()
         elif state == "unit":
-            print("BCP unit")
             dat["trail"].append([var, cl_index])
 #            added, var = addAndRemoveWatch(dat, var*-1)      
         elif state == "unresolved":
-            print("BCP unresolved")
             return state, var, cl_index
 
 def DPLL(clauses):
     dat = setup(clauses)
     while True:
         while True:
-            print("DPLL. trail= "+ str(dat["trail"]))
             BCP_result, var, cl_index = BCP(dat)
             if BCP_result == "unsat":
                 backtrack(dat, var, cl_index)
             if BCP_result == "unresolved": break
         decide(dat)
 
-def run(file):
-    result = DPLL(delete_doubles(parse_dimacs(file)))
+def run():
+    result = DPLL(delete_doubles(parse_dimacs()))
     if result == "unsat":unsat()
     else:sat()
     
@@ -231,6 +226,4 @@ def sat():
     print("sat")
     sys.exit(10)
 
-run(sys.argv[1])
-
-
+run()
