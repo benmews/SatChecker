@@ -13,14 +13,8 @@ def parse_dimacs(file):
             assert literals[-1] == 0
             literals = literals[:-1]
             clauses.append(literals)
-    return clauses
+            clauses = [list(set(clause)) for clause in clauses if len(set(clause)) == len(set([abs(var) for var in clause]))]
 
-def delete_doubles(clauses):
-    for clause in clauses:
-        for var in clause:
-            if var*-1 in clause:
-                clauses.remove(clause)
-                break
     return clauses
 
 def setup(clauses):
@@ -236,7 +230,7 @@ def DPLL(clauses):
         decide(dat)
 
 def run(file):
-    result = DPLL(delete_doubles(parse_dimacs(file)))
+    result = DPLL(parse_dimacs(file))
     if result == "unsat":unsat()
     else:sat()
 
@@ -255,8 +249,11 @@ def run_all(von, bis):
         finish_this = datetime.datetime.now()
         print("file = "+ str(i)+", exec time = "+str(finish_this-start_this))
 
+#test act vs jeroslow wang
+#2watch
+
 import datetime
 start = datetime.datetime.now()
-run_all(0,1)
+run_all(80,81)
 finish = datetime.datetime.now()
 print(finish-start)
