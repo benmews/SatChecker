@@ -26,46 +26,58 @@ def setup(clauses):
         variable_set.extend(clause)
         variable_set = [abs(ele) for ele in variable_set] 
         variable_set = list(set(variable_set))
+
     num_vars = len(variable_set)
     trail = []
-    activities = {}
+#    activities = {}
 #    watch = {}
 #    watched_variables = {}
+
+#    activity_counter_setting = 10
+#    activity_division_counter = activity_counter_setting
+    
+    JW = {}
     for var in variable_set:
-        activities[var] = 0
+        JW[var] = 0
+#        activities[var] = 0
 #        watch[var] = []
 #        watch[-var] = []
-    activity_counter_setting = 10
-    activity_division_counter = activity_counter_setting
+    
+    for clause in clauses:
+        JW_of_clause = 2**-len(clause)
+        for var in clause:
+            JW[abs(var)] += JW_of_clause
+    
     dat={}
     dat["clauses"] = clauses
 #    dat["watch"] = watch
     dat["trail"] = trail
-    dat["activities"] = activities
+    dat["JW"] = JW
+#    dat["activities"] = activities
 #    dat["watched_variables"] = watched_variables
     dat["num_vars"] = num_vars
     dat["variable_set"] = variable_set
-    dat["activity_division_counter"] = activity_division_counter
-    dat["activity_counter_setting"] = activity_counter_setting
+#    dat["activity_division_counter"] = activity_division_counter
+#    dat["activity_counter_setting"] = activity_counter_setting
 #    for clause_index, clause in enumerate(clauses):
 #        watched_variables[clause_index] = []
 #        for var in clause[0:2]:
 #            added, var = addToWatch(clause_index, clause, dat) # wenn 2scheme, auch hier prop
     return dat
 
-def manage_activity_counter(dat, conflict_parts):
-    increase_activities(dat, conflict_parts)  
-    dat["activity_division_counter"] = dat["activity_division_counter"]-1
-    if dat["activity_division_counter"] == 0:
-        for var in dat["variable_set"]:
-            dat["activities"][var] = dat["activities"][var]/2
-        dat["activity_division_counter"] = dat["activity_counter_setting"]
-
-def increase_activities(dat, conflict_parts):
-    for part in conflict_parts:
-        var = part[0]
-        if var < 0:var = var*-1
-        dat["activities"][var] = dat["activities"][var]+1
+#def manage_activity_counter(dat, conflict_parts):
+#    increase_activities(dat, conflict_parts)  
+#    dat["activity_division_counter"] = dat["activity_division_counter"]-1
+#    if dat["activity_division_counter"] == 0:
+#        for var in dat["variable_set"]:
+#            dat["activities"][var] = dat["activities"][var]/2
+#        dat["activity_division_counter"] = dat["activity_counter_setting"]
+#
+#def increase_activities(dat, conflict_parts):
+#    for part in conflict_parts:
+#        var = part[0]
+#        if var < 0:var = var*-1
+#        dat["activities"][var] = dat["activities"][var]+1
 
 #def addToWatch(clause_index, clause, dat):
 #    clause_abs = [abs(ele) for ele in clause] 
@@ -166,15 +178,16 @@ def checkClause(dat, cl_index, clause):
 #    clause_index = len(dat["clauses"])
 #    added, var = addToWatch(clause_index, conflict_clause, dat) # wenn 2scheme, auch hier prop
 #    added, var = addToWatch(clause_index, conflict_clause, dat)
-         
+
 def decide(dat):
     assigned = getAssignedVars(dat)
     assigned_abs = [abs(x) for x in assigned]
-    unassigned = [var for var in dat["variable_set"] if var not in assigned_abs]
-    activities_unassigned = {key:value for key, value in dat["activities"].items() if key in unassigned}
-    var = max(activities_unassigned)
-    var = var*-1 # negative first
-    dat["trail"].append([var, "DL"]) # var, DL or clause
+#    unassigned_abs = [var for var in dat["variable_set"] if var not in assigned_abs]
+#    activities_unassigned = {key:value for key, value in dat["activities"].items() if key in unassigned_abs}
+#    var = max(activities_unassigned)
+    JW_unassigned = {key:value for key, value in dat["JW"].items() if key not in assigned_abs}
+    var = max(JW_unassigned)
+    dat["trail"].append([var*-1, "DL"]) # var, DL or clause # negative first
 #    added, var = addAndRemoveWatch(dat, var*-1)
     
 def backtrack(dat, var, cl_index):
@@ -188,7 +201,7 @@ def backtrack(dat, var, cl_index):
         if DL_or_cl == "DL": break;
     dat["trail"].append([var*-1, "Backtrack"])
 #    add_conflict_clause(dat, conflict_parts) 
-    manage_activity_counter(dat, conflict_parts)
+#    manage_activity_counter(dat, conflict_parts)
 
 def BCP(dat):
     while True:
