@@ -33,8 +33,8 @@ def setup(clauses):
     num_vars = len(variable_set)
     trail = []
 #    activities = {}
-#    watch = {}
-#    watched_variables = {}
+    watch = {}
+    watched_variables = {}
 
 #    activity_counter_setting = 10
 #    activity_division_counter = activity_counter_setting
@@ -43,8 +43,8 @@ def setup(clauses):
     for var in variable_set:
         JW[var] = 0
 #        activities[var] = 0
-#        watch[var] = []
-#        watch[-var] = []
+        watch[var] = []
+        watch[-var] = []
 
     for clause in clauses:
         JW_of_clause = 2**-len(clause)
@@ -54,20 +54,20 @@ def setup(clauses):
     clauses_sat = []
     dat={}
     dat["clauses"] = clauses
-#    dat["watch"] = watch
+    dat["watch"] = watch
     dat["trail"] = trail
     dat["JW"] = JW
     dat["clauses_satisfied"] = clauses_sat
 #    dat["activities"] = activities
-#    dat["watched_variables"] = watched_variables
+    dat["watched_variables"] = watched_variables
     dat["num_vars"] = num_vars
     dat["variable_set"] = variable_set
 #    dat["activity_division_counter"] = activity_division_counter
 #    dat["activity_counter_setting"] = activity_counter_setting
-#    for clause_index, clause in enumerate(clauses):
-#        watched_variables[clause_index] = []
-#        for var in clause[0:2]:
-#            added, var = addToWatch(clause_index, clause, dat) # wenn 2scheme, auch hier prop
+    for clause_index, clause in enumerate(clauses):
+        watched_variables[clause_index] = []
+        for var in clause[0:2]:
+            added, var = addToWatch(clause_index, clause, dat) # wenn 2scheme, auch hier prop
     return dat
 
 #def manage_activity_counter(dat, conflict_parts):
@@ -84,53 +84,52 @@ def setup(clauses):
 #        if var < 0:var = var*-1
 #        dat["activities"][var] = dat["activities"][var]+1
 
-#def addToWatch(clause_index, clause, dat):
-#    clause_abs = [abs(ele) for ele in clause]
-#    vars_assigned = getAssignedVars(dat)
-#    vars_assigned_abs =  [abs(ele) for ele in vars_assigned]
-#    vars_watched = dat["watched_variables"][clause_index]
-#    vars_watched_abs =  [abs(ele) for ele in vars_watched]
-#    vars_open_abs = [x for x in clause_abs if x not in vars_watched_abs]
-#    vars_open_abs = [x for x in vars_open_abs if x not in vars_assigned_abs]
-#    vars_open_abs_len = len(vars_open_abs)
-#    var = vars_open_abs[0]
-#    var_abs = vars_open_abs[0]
-#    if var*-1 in clause:
-#        var = var*-1
-#    if vars_open_abs_len >= 1:
-#        dat["watch"][var].append(clause_index)
-#        dat["watched_variables"][clause_index].append(var)
-#        print("addtoWatch open. trail: " + str(dat["trail"]))
-#        return "open", var_abs
-#    else:
-#        vars_watched_and_unassigned = [x for x in vars_watched if x not in vars_assigned]
-#        if len(vars_watched_and_unassigned) == 1:
-#            return "unit", var_abs
-#        if len(vars_watched_and_unassigned) == 0:
-#            return checkClause(dat, clause_index, clause)
-#        else:
-#            print("ERROR")
-#            sys.exit(1)
+def addToWatch(clause_index, clause, dat):
+    clause_abs = [abs(ele) for ele in clause]
+    vars_assigned = getAssignedVars(dat)
+    vars_assigned_abs =  [abs(ele) for ele in vars_assigned]
+    vars_watched = dat["watched_variables"][clause_index]
+    vars_watched_abs =  [abs(ele) for ele in vars_watched]
+    vars_open_abs = [x for x in clause_abs if x not in vars_watched_abs]
+    vars_open_abs = [x for x in vars_open_abs if x not in vars_assigned_abs]
+    vars_open_abs_len = len(vars_open_abs)
+    var = vars_open_abs[0]
+    var_abs = vars_open_abs[0]
+    if var*-1 in clause:
+        var = var*-1
+    if vars_open_abs_len >= 1:
+        dat["watch"][var].append(clause_index)
+        dat["watched_variables"][clause_index].append(var)
+        return "open", var_abs
+    else:
+        vars_watched_and_unassigned = [x for x in vars_watched if x not in vars_assigned]
+        if len(vars_watched_and_unassigned) == 1:
+            return "unit", var_abs
+        if len(vars_watched_and_unassigned) == 0:
+            return checkClause(dat, clause_index, clause)
+        else:
+            print("ERROR")
+            sys.exit(1)
 
-#def addAndRemoveWatch(dat, var):
-#    watch_this = dat["watch"][var].copy()
-#    for clause_index in watch_this:
-#        added, var = addToWatch(clause_index, dat["clauses"][clause_index], dat)
-#        if added == "open":
-#            dat["watch"][var].remove(clause_index)
-#            dat["watched_variables"][clause_index].remove(var)      # eigentlich anstatt von hasStatte an dieser stelle nach unit checken.dann wird erst 2varscheme benutzt. propagate bevor alle watches gelöscht sind. watch nur löschen wenn woanders geadded wurde
-#
-#    return added, var
+def addAndRemoveWatch(dat, var):
+    watch_this = dat["watch"][var].copy()
+    for clause_index in watch_this:
+        added, var = addToWatch(clause_index, dat["clauses"][clause_index], dat)
+        if added == "open":
+            dat["watch"][var].remove(clause_index)
+            dat["watched_variables"][clause_index].remove(var)      # eigentlich anstatt von hasStatte an dieser stelle nach unit checken.dann wird erst 2varscheme benutzt. propagate bevor alle watches gelöscht sind. watch nur löschen wenn woanders geadded wurde
+
+    return added, var
+
+def getWatchedVars(watch, clause_index):
+    variables = [var for var, cl_index in enumerate(watch) if cl_index == clause_index]
+    return variables
 
 def getAssignedVars(dat):
     assigned = []
     for trai in dat["trail"]:
         assigned.append(trai[0])
     return assigned
-
-#def getWatchedVars(watch, clause_index):
-#    variables = [var for var, cl_index in enumerate(watch) if cl_index == clause_index]
-#    return variables
 
 def hasState(dat): # not necessary bec of two watched lit scheme?
     sat_clauses_counter = 0
@@ -258,6 +257,6 @@ def run_all(von, bis):
 
 import datetime
 start = datetime.datetime.now()
-run_all(10,20)
+run_all(0,1)
 finish = datetime.datetime.now()
 print(finish-start)
