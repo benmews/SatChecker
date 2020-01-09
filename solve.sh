@@ -2,4 +2,4 @@
 
 ##### Python
 echo "Python"
-python3 example.py $*
+python3 BCP-JW.py $*
