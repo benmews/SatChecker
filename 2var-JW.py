@@ -142,7 +142,7 @@ def decide(dat):
     JW_unassigned = {key:value for key, value in dat["JW"].items() if key not in assigned_abs}
     if len(JW_unassigned) == 0:
         sat()
-    var = max(JW_unassigned)
+    var = keywithmaxval(JW_unassigned)
     dat["trail"].append([var, "DL"]) # var, DL or clause # negative first or JW for both?
     propagate(dat, var)
 
@@ -156,6 +156,11 @@ def backtrack(dat, var, cl_index):
         del dat["trail"][-1]
         if DL_or_cl == "DL": break;
     dat["trail"].append([-var, "Backtrack"])
+
+def keywithmaxval(JW_unassigned):
+     v=list(JW_unassigned.values())
+     k=list(JW_unassigned.keys())
+     return k[v.index(max(v))]
 
 def get_watched_variables(watch, clause_index):
     variables = [var for var, cl_index in enumerate(watch) if cl_index == clause_index]
