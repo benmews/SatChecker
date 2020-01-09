@@ -64,7 +64,6 @@ def setup(clauses):
 #    dat["activities"] = activities
 #    dat["watched_variables"] = watched_variables
     dat["num_vars_abs"] = num_vars_abs
-    print(num_vars_abs)
     dat["variable_set_abs"] = variable_set_abs
     dat["variable_set_both"] = variable_set_both
 #    dat["activity_division_counter"] = activity_division_counter
@@ -180,7 +179,7 @@ def checkClause(dat, cl_index, clause):
     unsatisfied_vars = 0
     openvars = []
     for var in clause:
-        if var*-1 in assigned:
+        if -var in assigned:
             unsatisfied_vars = unsatisfied_vars+1
         elif var in assigned:
             return "sat", var
@@ -226,15 +225,12 @@ def decide(dat):
             sat()
         elif state == "unsat":
             unsat()
-        print("error in decide")
     var = keywithmaxval(JW_unassigned)
     dat["trail"].append([var, "DL"]) # var, DL or clause # negative first
 #    added, var = addAndRemoveWatch(dat, var*-1)
-#    print("decide: var = " + str(var)+ ", JW_unassign = "+ str(JW_unassigned))
     return "decide", -var
 
 def backtrack(dat, var, cl_index):
-    print("backtrack = " + str(var))
     conflict_parts = [[var, cl_index]]
     while True:
         if len(dat["trail"]) == 0:
@@ -257,7 +253,6 @@ def BCP(dat):
             return "sat", var, cl_index #exit
         elif state == "unit":
             dat["trail"].append([var, cl_index])
-            print("propagated")
 #            added, var = addAndRemoveWatch(dat, var*-1)
         elif state == "unresolved":
             return state, var, cl_index
@@ -270,15 +265,15 @@ def DPLL(clauses):
     while True:
         while True:
             if state == "unsat":
-                print("backtrack")
                 backtrack_result = backtrack(dat, var, cl_index)
                 if backtrack_result == "unsat":
                     unsat()
             if state == "sat":
                 return "sat"
-            if state == "unresolved": break
+            if state == "unresolved": 
+                break
             state, var, cl_index = BCP(dat)
-        state_of_clause, var = decide(dat) # no return if BCP
+        state, var = decide(dat) # no return if BCP
 
 def run():
     result = DPLL(parse_dimacs())
