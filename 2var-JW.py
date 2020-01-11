@@ -43,6 +43,7 @@ def setup(clauses):
             JW[abs(var)] += JW_of_clause
     clauses_sat = []
     dat={}
+    dat["prop_schedule"] = []
     dat["clauses"] = clauses
     dat["watch"] = watch
     dat["trail"] = trail
@@ -71,25 +72,28 @@ def DPLL(clauses):
     initial_assignments(dat)
     print("DPLL")
     decide(dat)
+    print("trail = " + str(dat["trail"]))
 
 def propagate(dat, var_old):
     watch_this = dat["watch"][var_old].copy()
     for clause_index in watch_this:
-        print("wathc this: " + str(watch_this))
-        var_new, state = find_next_var_to_watch(dat, clause_index)
-        if state == "unit":
+        var_new, state_new = find_next_var_to_watch(dat, clause_index)
+        print("wathc this: " + str(watch_this) + " state_new = "+ str(state_new))
+        if state_new == "unit":
             dat["trail"].append([var_new, clause_index])
-            propagate(dat, var_new)
-            return
-        if state == "resolved":
-            check_clause(dat, clause_index)
-            return 
-        if state == "unresolved":
+            dat["prop_schedule"].append([var_new]) # TODO biswohin backktrack 
+        elif state_new == "unresolved":
             print("unres")
             dat["watch"][var_new].append(clause_index)
             dat["watched_variables"][clause_index].append(var_new)
             dat["watch"][var_old].remove(clause_index)
-            dat["watched_variables"][clause_index].remove(var_old)   
+            dat["watched_variables"][clause_index].remove(var_old) 
+    if len(dat["prop_schedule"]) == 0:
+        decide()
+    else:
+        var_new = dat["prop_schedule"][0]
+        del dat["prop_schedule"][0]
+        propagate(dat, var_new)
         
 def find_next_var_to_watch(dat, clause_index):
     clause_abs = [abs(ele) for ele in dat["clauses"][clause_index]]
@@ -105,6 +109,7 @@ def find_next_var_to_watch(dat, clause_index):
         if len(vars_watched_and_unassigned) == 1: # unit
             return vars_watched_and_unassigned[0], "unit"
         elif len(vars_watched_and_unassigned) == 0: # sat or unsat?
+#            state_clause = check_cclause(dat, clause_index)
             return False, "resolved"
     else:
         var = vars_open_abs[0]
@@ -112,16 +117,32 @@ def find_next_var_to_watch(dat, clause_index):
             var = -var
     return var, "unresolved"
         
-def check_clause(dat, clause_index):
+#def check_clause(dat, clause_index):
+#    assigned = get_assigned_variables(dat)
+#    unsatisfied_vars = 0
+#    for var in dat["clauses"][clause_index]:
+#        if -var in assigned:
+#            unsatisfied_vars = unsatisfied_vars+1
+#        elif var in assigned:
+#            return "sat"
+#    if unsatisfied_vars == len(dat["clauses"][clause_index]):
+#        backtrack(dat, var, clause_index)
+
+def check_formular(dat): # has to be fully assigned
     assigned = get_assigned_variables(dat)
-    unsatisfied_vars = 0
-    for var in dat["clauses"][clause_index]:
-        if -var in assigned:
-            unsatisfied_vars = unsatisfied_vars+1
-        elif var in assigned:
-            return
-    if unsatisfied_vars == len(dat["clauses"][clause_index]):
-        backtrack(dat, var, clause_index)
+    satisfied_clauses = 0
+    for clause_index, clause in enumerate(dat["clauses"]):
+        unsatisfied_vars = 0
+        for var in dat["clauses"][clause_index]:
+            if -var in assigned:
+                unsatisfied_vars = unsatisfied_vars+1
+            elif var in assigned:
+                satisfied_clauses += 1
+                break
+        if unsatisfied_vars == len(dat["clauses"][clause_index]):
+            backtrack(dat, var, clause_index)
+    if satisfied_clauses == len(dat["clauses"]):
+        sat()
 
 def decide(dat):
     assigned = get_assigned_variables(dat)
@@ -130,7 +151,10 @@ def decide(dat):
     print(len(JW_unassigned))
     if len(JW_unassigned) == 0:
         print("cant decide anymore")
-        sat()
+        state = check_formular(dat)
+        if state == "sat":
+            sat()   #should not be possible to be unsat because for each clause checkk_clause does backtrack
+        else: print("ERROR SHOULD NOT HAPPEN")
     var = key_with_max_val(JW_unassigned)
     dat["trail"].append([var, "DL"]) # var, DL or clause # negative first or JW for both?
     print(dat["trail"])
@@ -145,6 +169,7 @@ def backtrack(dat, var, clause_index):
         var, DL_or_cl = dat["trail"][-1]
         conflict_parts.append([var, DL_or_cl])
         del dat["trail"][-1]
+#        del dat["prop_schedule"][-1] # brauche nicht? ist ja nicht mehr assigned, also kann ruhig watch ändern. sollte keine units mehr geben?
         if DL_or_cl == "DL": break;
     dat["trail"].append([-var, "backtrack"])
 
