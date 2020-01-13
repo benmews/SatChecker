@@ -1,5 +1,8 @@
 import sys
 
+# improve: split check_clause and divide to 2 places where used
+# improve: use activities
+
 #outcommented: activities(working), 2variableScheme(not working yet), clauseResulution(not working yet)
 #before handin: satt() direct in hasState, DPLL, BCP etc. , unsatt() direkt in backtr ack. remove run_all. parse_dimacs ohne "file"
 
@@ -35,8 +38,8 @@ def setup(clauses):
     JW = {}
     for var_abs in variable_set_abs:
         JW[var_abs] = 0
-    for var_both in variable_set_both:
-        watch[var_both] = []
+        watch[var_abs] = []
+        watch[-var_abs] = []
     for clause in clauses:
         JW_of_clause = 2**-len(clause)
         for var in clause:
@@ -62,40 +65,41 @@ def initial_assignments(dat):
         clause_this = dat["clauses"][clause_index]
         dat["watch"][clause_this[0]].append(clause_index)
         dat["watched_variables"][clause_index].append(clause_this[0])
-        var, state = find_next_var_to_watch(dat, clause_index)
-        if state != "resolved":                                 #improve hier checken/propagaten
+        var, state = find_next_var_to_watch(dat, clause_index, 0)
+        if state != "resolved":                                 #improve hier checken/propaggaten
             dat["watch"][var].append(clause_index)
             dat["watched_variables"][clause_index].append(var)
 
 def DPLL(clauses):
     dat = setup(clauses)
     initial_assignments(dat)
-    print("DPLL")
     decide(dat)
-    print("trail = " + str(dat["trail"]))
 
 def propagate(dat, var_old):
-    watch_this = dat["watch"][var_old].copy()
+    watch_this = dat["watch"][-var_old].copy()
     for clause_index in watch_this:
-        var_new, state_new = find_next_var_to_watch(dat, clause_index)
-        print("wathc this: " + str(watch_this) + " state_new = "+ str(state_new))
+        var_new, state_new = find_next_var_to_watch(dat, clause_index, -var_old)
         if state_new == "unit":
             dat["trail"].append([var_new, clause_index])
-            dat["prop_schedule"].append([var_new]) # TODO biswohin backktrack 
+            dat["prop_schedule"].append(var_new) # TODO biswohin backktrack , als liste?
         elif state_new == "unresolved":
-            print("unres")
             dat["watch"][var_new].append(clause_index)
             dat["watched_variables"][clause_index].append(var_new)
-            dat["watch"][var_old].remove(clause_index)
-            dat["watched_variables"][clause_index].remove(var_old) 
+            dat["watch"][-var_old].remove(clause_index)     #wirklich -var?
+            dat["watched_variables"][clause_index].remove(-var_old) 
+        elif state_new == "resolved":
+            state_resolved = check_clause(dat, clause_index)
+            if state_resolved == "unsat":
+                backtrack(dat, 0, clause_index)  # 0 hier ändern wenn activations.
     if len(dat["prop_schedule"]) == 0:
-        decide()
+        decide(dat)
     else:
         var_new = dat["prop_schedule"][0]
         del dat["prop_schedule"][0]
         propagate(dat, var_new)
+    
         
-def find_next_var_to_watch(dat, clause_index):
+def find_next_var_to_watch(dat, clause_index, var_old_neg):
     clause_abs = [abs(ele) for ele in dat["clauses"][clause_index]]
     vars_assigned = get_assigned_variables(dat)
     vars_assigned_abs =  [abs(ele) for ele in vars_assigned]
@@ -105,10 +109,12 @@ def find_next_var_to_watch(dat, clause_index):
     vars_open_abs = [x for x in vars_open_abs if x not in vars_assigned_abs]
     vars_open_abs_len = len(vars_open_abs)
     if vars_open_abs_len == 0:
-        vars_watched_and_unassigned = [x for x in vars_watched if x not in vars_assigned]
+        if check_clause(dat, clause_index) == "sat":
+            return False, "resolved"
+        vars_watched_and_unassigned = [x for x in vars_watched if x not in vars_assigned and x not in [var_old_neg]]
         if len(vars_watched_and_unassigned) == 1: # unit
             return vars_watched_and_unassigned[0], "unit"
-        elif len(vars_watched_and_unassigned) == 0: # sat or unsat?
+        elif len(vars_watched_and_unassigned) == 0: # sat or unsat?2
 #            state_clause = check_cclause(dat, clause_index)
             return False, "resolved"
     else:
@@ -117,16 +123,16 @@ def find_next_var_to_watch(dat, clause_index):
             var = -var
     return var, "unresolved"
         
-#def check_clause(dat, clause_index):
-#    assigned = get_assigned_variables(dat)
-#    unsatisfied_vars = 0
-#    for var in dat["clauses"][clause_index]:
-#        if -var in assigned:
-#            unsatisfied_vars = unsatisfied_vars+1
-#        elif var in assigned:
-#            return "sat"
-#    if unsatisfied_vars == len(dat["clauses"][clause_index]):
-#        backtrack(dat, var, clause_index)
+def check_clause(dat, clause_index):
+    assigned = get_assigned_variables(dat)
+    unsatisfied_vars = 0
+    for var in dat["clauses"][clause_index]:
+        if -var in assigned:
+            unsatisfied_vars = unsatisfied_vars+1
+        elif var in assigned:
+            return "sat"
+    if unsatisfied_vars == len(dat["clauses"][clause_index]):
+        return "unsat"
 
 def check_formular(dat): # has to be fully assigned
     assigned = get_assigned_variables(dat)
@@ -148,35 +154,33 @@ def decide(dat):
     assigned = get_assigned_variables(dat)
     assigned_abs = [abs(x) for x in assigned]
     JW_unassigned = {key:value for key, value in dat["JW"].items() if key not in assigned_abs}
-    print(len(JW_unassigned))
     if len(JW_unassigned) == 0:
-        print("cant decide anymore")
         state = check_formular(dat)
         if state == "sat":
-            sat()   #should not be possible to be unsat because for each clause checkk_clause does backtrack
-        else: print("ERROR SHOULD NOT HAPPEN")
+            sat()   #should not be possible to be unsat because for each clause checkk_clause does backktrack
+        else: 
+            print("ERROR SHOULD NOT HAPPEN")
     var = key_with_max_val(JW_unassigned)
     dat["trail"].append([var, "DL"]) # var, DL or clause # negative first or JW for both?
-    print(dat["trail"])
     propagate(dat, var)
 
 def backtrack(dat, var, clause_index):
     conflict_parts = [[var, clause_index]]
     while True:
         if len(dat["trail"]) == 0:
-            print("backtrrack trail 0")
             unsat()
         var, DL_or_cl = dat["trail"][-1]
         conflict_parts.append([var, DL_or_cl])
         del dat["trail"][-1]
-#        del dat["prop_schedule"][-1] # brauche nicht? ist ja nicht mehr assigned, also kann ruhig watch ändern. sollte keine units mehr geben?
         if DL_or_cl == "DL": break;
+    del dat["prop_schedule"][:] # brauche nicht? ist ja nicht mehr assigned, also kann ruhig watch ändern. sollte keine units mehr geben?
     dat["trail"].append([-var, "backtrack"])
+    propagate(dat, -var)
 
 def key_with_max_val(JW_unassigned):
-     v=list(JW_unassigned.values())
-     k=list(JW_unassigned.keys())
-     return k[v.index(max(v))]
+    v=list(JW_unassigned.values())
+    k=list(JW_unassigned.keys())
+    return k[v.index(max(v))]
 
 def get_watched_variables(watch, clause_index):
     variables = [var for var, cl_index in enumerate(watch) if cl_index == clause_index]
@@ -197,7 +201,6 @@ def sat():
     sys.exit(10)
 
 DPLL(parse_dimacs())
-print("end")
 
 #def hasState(dat): # not necessary bec of two watched lit scheme?
 #    sat_clauses_counter = 0
